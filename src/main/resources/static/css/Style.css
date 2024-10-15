@@ -1,0 +1,24 @@
+@charset "UTF-8";
+
+
+input[type="file"] {
+           background-color: #f0f0f0; /* 背景色 */
+           border: 2px solid #007BFF; /* ボーダー色 */
+           color: #333; /* テキスト色 */
+           padding: 10px; /* パディング */
+           border-radius: 5px; /* 角を丸くする */
+}
+
+/* ボタンのスタイル */
+ button {
+           background-color: #007BFF; /* ボタン背景色 */
+           color: white; /* ボタンテキスト色 */
+           border: none; /* ボーダーなし */
+           padding: 10px 15px; /* パディング */
+           border-radius: 5px; /* 角を丸くする */
+           cursor: pointer; /* カーソルをポインターに */
+}
+
+button:hover {
+           background-color: #0056b3; /* ホバー時の色 */
+}

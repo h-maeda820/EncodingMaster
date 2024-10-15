@@ -25,6 +25,6 @@ public class TextConverterController {
 
 		
 
-		return "redirect:/TextConverter/upload";
+		return "download";
 	}
 }

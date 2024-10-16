@@ -1,11 +1,12 @@
 package com.example.em.controller;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
 
+import org.apache.commons.io.IOUtils;
+import org.mozilla.universalchardet.UniversalDetector;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,25 +28,53 @@ public class TextConverterController {
 	@PostMapping("/upload")
 	public String TextConverterPost(
 			@RequestParam("file") MultipartFile file,
-			@RequestParam("options") String encoding,
-			RedirectAttributes redirectAttributes) {
+			@RequestParam("options") String charset,
+			RedirectAttributes redirectAttributes) throws IOException {
 
 		try {
-			InputStream stream = file.getInputStream();
-			Reader reader = new InputStreamReader(stream, "UTF-8");
-			BufferedReader buf = new BufferedReader(reader);
+			// 文字コードを検出
+			String detectedEncoding = detectEncoding(file);
+			System.out.println(detectedEncoding);
 
-			String str;
+			// ファイルの内容を読み込み、指定された文字コードに変換
+			byte[] fileContent = file.getBytes();
+			String originalContent = new String(fileContent, detectedEncoding); // 元の文字コードを仮にUTF-8とする
+			byte[] convertedContent = originalContent.getBytes(charset);
 
-			while ((str = buf.readLine()) != null) {
+			// レスポンスとして変換後のファイルを返す
+			HttpHeaders headers = new HttpHeaders();
+			headers.setContentDisposition(ContentDisposition.builder("attachment")
+					.filename("converted.txt")
+					.build());
+			headers.setContentType(MediaType.TEXT_PLAIN);
 
-			}
+			//return new ResponseEntity<>(convertedContent, headers, HttpStatus.OK);
 
 		} catch (IOException e) {
-			e.printStackTrace();
+			return "ファイルの処理中にエラーが発生しました: " + e.getMessage();
 		}
 
 		return "redirect:/TextConverter/upload";
 	}
 
+	public String detectEncoding(MultipartFile file) throws IOException {
+		// ファイルをバイト配列に変換
+		byte[] fileBytes = IOUtils.toByteArray(file.getInputStream());
+
+		// UniversalDetector を使用して文字コードを検出
+		UniversalDetector detector = new UniversalDetector(null);
+		detector.handleData(fileBytes, 0, fileBytes.length);
+		detector.dataEnd();
+
+		// 検出されたエンコーディングを取得
+		String encoding = detector.getDetectedCharset();
+		detector.reset();
+
+		// エンコーディングが検出できなかった場合の処理
+		if (encoding == null) {
+			encoding = "????";
+		}
+
+		return encoding;
+	}
 }

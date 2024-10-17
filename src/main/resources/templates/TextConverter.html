@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ファイルアップロード</title>
+    <title>文字コード変換</title>
     <style>
         /* inputの色を変更 */
         input[type="file"], select {
@@ -45,12 +45,18 @@
 </head>
 <body>
     <form action="/TextConverter/upload" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" accept=".txt,.csv" />
+        <input type="file" name="file" accept=".txt" />
         <label for="options">文字コードを選択:</label>
         <select id="options" name="options">
-            <option value="option1">ASCII</option>
-            <option value="option2">UTF-8</option>
-            <option value="option3">UTF-16</option>
+            <option value="unselected"> </option>
+            <option value="UTF-8">UTF-8</option>
+            <option value="UTF-16">UTF-16</option>
+            <option value="ISO-8859-1">Latin-1</option>
+            <option value="Windows-1252">Windows-1252</option>
+            <option value="EUC-JP">EUC-JP</option>
+            <option value="Big5">Big5</option>
+            <option value="US-ASCII">ASCII</option>
+            <option value="Shift_JIS">SJIS</option>
         </select>
         <button type="submit">変換</button>
     </form>

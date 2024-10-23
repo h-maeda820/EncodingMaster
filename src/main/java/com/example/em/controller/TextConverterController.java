@@ -1,10 +1,11 @@
 package com.example.em.controller;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,9 +42,14 @@ public class TextConverterController {
 	@PostMapping("/upload")
 	public ResponseEntity<FileSystemResource> TextConverterPost(
 			@RequestParam("file") MultipartFile file,
+			@RequestParam(name = "bom", required = false) Boolean bomExist,
 			@RequestParam("options") String charset,
 			RedirectAttributes redirectAttributes,
 			HttpServletResponse response) throws IOException {
+
+		//未入力チェック
+		
+		
 
 		// 現在の日時を取得してフォーマット
 		String times = LocalDateTime.now().format(DateTimeFormatter.ofPattern("_yyyyMMdd_HHmmss"));
@@ -53,15 +59,49 @@ public class TextConverterController {
 		String detectedCharset = detectEncoding(file);
 		System.out.println(detectedCharset);
 
+		if (detectedCharset.equals("E-001")) {
+			redirectAttributes.addFlashAttribute("errorMessage", "アップロードしたファイルの文字コードが識別できません");
+			return ResponseEntity.status(HttpStatus.FOUND) // 302リダイレクト
+					.location(URI.create("/TextConverter/upload")) // リダイレクト先のURI
+					.build();
+		}
+
 		//テキストを読み込む
 		String content = readFile(file, detectedCharset);
 		System.out.println(content);
-		
-		//変換
-		byte[] change = content.getBytes(Charset.forName("Shift_JIS"));
 
-		// 指定された文字コードで変換
-		///String converted = new String(content, Charset.forName("Shift_JIS"));
+		//変換
+		byte[] change = content.getBytes(Charset.forName(charset));
+
+		// charsetがUTF-8, UTF-16LE, UTF-16BE, UTF-32LE, UTF-32BEの場合
+		if (charset.equals("UTF-8") || charset.equals("UTF-16LE") || charset.equals("UTF-16BE")
+				|| charset.equals("UTF-32LE") || charset.equals("UTF-32BE")) {
+
+			//チェック入ってる場合
+			if (bomExist != null && bomExist) {
+
+				// 変換後にbomがあるかチェック
+				if (detectBOM(change) == 0) {
+
+					// BOMがない場合、BOMを取得
+					byte[] bom = getBOM(charset);
+
+					// BOMを先頭に追加するための新しい配列を作成
+					byte[] result = new byte[bom.length + change.length];
+
+					// BOMを先頭にコピー
+					System.arraycopy(bom, 0, result, 0, bom.length);
+
+					// 変換した内容をその後にコピー
+					System.arraycopy(change, 0, result, bom.length, change.length);
+
+					// changeを更新
+					change = result;
+
+				}
+			}
+
+		}
 
 		// 新しいファイル名を作成
 		//現在のファイル名を取得
@@ -87,15 +127,7 @@ public class TextConverterController {
 
 			// 一時ファイルに文字列を書き込む
 			Files.write(tempFile, change, StandardOpenOption.WRITE);
-			
-			//テストここから
-			String detectedCharset2 = detectEncoding(tempFile.toFile());
-			System.out.println("変換後:" + detectedCharset2);
-			String content2 = readFile(file, detectedCharset);
-			System.out.println("変換後:\n"+content2.toString());
-			System.out.println("-------------");
-			//テストここまで
-			
+
 			// ファイルリソースを作成
 			FileSystemResource resource = new FileSystemResource(tempFile);
 
@@ -106,7 +138,7 @@ public class TextConverterController {
 			// レスポンスを返す
 			ResponseEntity<FileSystemResource> responseEntity = new ResponseEntity<>(resource, headers, HttpStatus.OK);
 
-			// レスポンス後にファイルを削除したい
+			// レスポンス後に一時ファイルを削除したい
 			new Thread(() -> {
 				try {
 					Thread.sleep(1000); // 1秒待つ
@@ -139,59 +171,90 @@ public class TextConverterController {
 
 		// エンコーディングが検出できなかった場合の処理
 		if (encoding == null) {
-			encoding = "????";
+			encoding = "E-001";
 		}
 
 		return encoding;
 	}
 
-	// 文字コードを判定する(テスト用)
-	public String detectEncoding(File file) throws IOException {
-		// ファイルをバイト配列に変換
-		byte[] fileBytes = Files.readAllBytes(file.toPath());
+	// BOMを判定するメソッド
+	private int detectBOM(InputStream inputStream) throws IOException {
+		BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
+		byte[] bom = new byte[4];
+		bufferedInputStream.mark(bom.length); // ストリームの位置をマーク
+		int readBytes = bufferedInputStream.read(bom, 0, bom.length);
+		int bomLength = 0;
 
-		// UniversalDetector を使用して文字コードを検出
-		UniversalDetector detector = new UniversalDetector(null);
-		detector.handleData(fileBytes, 0, fileBytes.length);
-		detector.dataEnd();
-
-		// 検出されたエンコーディングを取得
-		String encoding = detector.getDetectedCharset();
-		detector.reset();
-
-		// エンコーディングが検出できなかった場合の処理
-		if (encoding == null) {
-			encoding = "????";
+		// BOMをチェックして、スキップするバイト数を決定する
+		if (readBytes >= 3 && bom[0] == (byte) 0xEF && bom[1] == (byte) 0xBB && bom[2] == (byte) 0xBF) {
+			bomLength = 3; // UTF-8 BOM
+			System.out.println("UTF-8 BOM");
+		} else if (readBytes >= 2 && bom[0] == (byte) 0xFE && bom[1] == (byte) 0xFF) {
+			bomLength = 2; // UTF-16 BE BOM
+			System.out.println("UTF-16 BE BOM");
+		} else if (readBytes >= 2 && bom[0] == (byte) 0xFF && bom[1] == (byte) 0xFE) {
+			bomLength = 2; // UTF-16 LE BOM
+			System.out.println("UTF-16 LE BOM");
+		} else if (readBytes >= 4 && bom[0] == (byte) 0x00 && bom[1] == (byte) 0x00 && bom[2] == (byte) 0xFE
+				&& bom[3] == (byte) 0xFF) {
+			bomLength = 4; // UTF-32 BE BOM
+			System.out.println("UTF-32 BE BOM");
+		} else if (readBytes >= 4 && bom[0] == (byte) 0xFF && bom[1] == (byte) 0xFE && bom[2] == (byte) 0x00
+				&& bom[3] == (byte) 0x00) {
+			bomLength = 4; // UTF-32 LE BOM
+			System.out.println("UTF-32 LE BOM");
 		}
 
-		return encoding;
+		// ストリームの位置をリセット
+		bufferedInputStream.reset();
+
+		return bomLength;
 	}
 
-	//テキスト読み込む
+	//bom判定変換後
+	private int detectBOM(byte[] data) {
+		int bomLength = 0;
+
+		// BOMをチェック
+		if (data.length >= 3 && data[0] == (byte) 0xEF && data[1] == (byte) 0xBB && data[2] == (byte) 0xBF) {
+			bomLength = 3; // UTF-8 BOM
+			System.out.println("UTF-8 BOM");
+		} else if (data.length >= 2 && data[0] == (byte) 0xFE && data[1] == (byte) 0xFF) {
+			bomLength = 2; // UTF-16 BE BOM
+			System.out.println("UTF-16 BE BOM");
+		} else if (data.length >= 2 && data[0] == (byte) 0xFF && data[1] == (byte) 0xFE) {
+			bomLength = 2; // UTF-16 LE BOM
+			System.out.println("UTF-16 LE BOM");
+		} else if (data.length >= 4 && data[0] == (byte) 0x00 && data[1] == (byte) 0x00 && data[2] == (byte) 0xFE
+				&& data[3] == (byte) 0xFF) {
+			bomLength = 4; // UTF-32 BE BOM
+			System.out.println("UTF-32 BE BOM");
+		} else if (data.length >= 4 && data[0] == (byte) 0xFF && data[1] == (byte) 0xFE && data[2] == (byte) 0x00
+				&& data[3] == (byte) 0x00) {
+			bomLength = 4; // UTF-32 LE BOM
+			System.out.println("UTF-32 LE BOM");
+		}
+
+		return bomLength;
+	}
+
+	// テキストを読み込む
 	private String readFile(MultipartFile file, String detectedCharset) throws IOException {
-		// MultipartFileからInputStreamを取得
-		try (InputStream inputStream = file.getInputStream()) {
-			// InputStreamを指定された文字コードで読み込む
-			BufferedReader reader = new BufferedReader(
-					new InputStreamReader(inputStream, Charset.forName(detectedCharset)));
-			StringBuilder content = new StringBuilder();
-			String line;
-
-			while ((line = reader.readLine()) != null) {
-				content.append(line).append(System.lineSeparator());
-			}
-
-			//			byte[] bytes = content.toString().getBytes(detectedCharset);
-
-			//			return bytes;
-			return content.toString();
-		}
-	}
-
-	// テキストを読み込む(テスト用)
-	private String readFile(File file, String detectedCharset) throws IOException {
 		// ファイルからInputStreamを取得
-		try (InputStream inputStream = Files.newInputStream(file.toPath())) {
+		try (InputStream inputStream = file.getInputStream()) {
+
+			int bomLength = 0;
+
+			if (detectedCharset.startsWith("UTF-")) {
+				// BOMを判定
+				bomLength = detectBOM(inputStream);
+			}
+
+			// BOMが存在する場合、そのバイト数をスキップする
+			if (bomLength > 0) {
+				inputStream.skip(bomLength);
+			}
+
 			// InputStreamを指定された文字コードで読み込む
 			BufferedReader reader = new BufferedReader(
 					new InputStreamReader(inputStream, Charset.forName(detectedCharset)));
@@ -202,9 +265,25 @@ public class TextConverterController {
 				content.append(line).append(System.lineSeparator());
 			}
 
-
 			return content.toString();
 		}
 	}
 
+	// BOMを取得するメソッド
+	private byte[] getBOM(String charset) {
+		switch (charset) {
+		case "UTF-8":
+			return new byte[] { (byte) 0xEF, (byte) 0xBB, (byte) 0xBF }; // UTF-8 BOM
+		case "UTF-16BE":
+			return new byte[] { (byte) 0xFE, (byte) 0xFF }; // UTF-16 BE BOM
+		case "UTF-16LE":
+			return new byte[] { (byte) 0xFF, (byte) 0xFE }; // UTF-16 LE BOM
+		case "UTF-32BE":
+			return new byte[] { (byte) 0x00, (byte) 0x00, (byte) 0xFE, (byte) 0xFF }; // UTF-32 BE BOM
+		case "UTF-32LE":
+			return new byte[] { (byte) 0xFF, (byte) 0xFE, (byte) 0x00, (byte) 0x00 }; // UTF-32 LE BOM
+		default:
+			return new byte[0]; // BOMなし
+		}
+	}
 }

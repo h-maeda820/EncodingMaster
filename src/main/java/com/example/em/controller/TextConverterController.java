@@ -5,7 +5,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,52 +22,54 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import com.example.em.models.TextConverterUploadForm;
 
 @Controller
 @RequestMapping("/TextConverter")
 public class TextConverterController {
 
-	@GetMapping("/upload")
+	@GetMapping("/view")
 	public String TextConverterGet() {
 
 		return "TextConverter";
 	}
 
-	@PostMapping("/upload")
-	public ResponseEntity<FileSystemResource> TextConverterPost(
-			@RequestParam("file") MultipartFile file,
-			@RequestParam(name = "bom", required = false) Boolean bomExist,
-			@RequestParam("options") String charset,
+	@PostMapping("/convert")
+	public String TextConverterPost(
+			@ModelAttribute("textConverterUploadForm") TextConverterUploadForm uploadForm,
 			RedirectAttributes redirectAttributes,
 			HttpServletResponse response) throws IOException {
 
-		//未入力チェック
-		
-		
+		String charset = uploadForm.getCharset();
+		Boolean bomExist = uploadForm.getBomExist();
 
-		// 現在の日時を取得してフォーマット
-		String times = LocalDateTime.now().format(DateTimeFormatter.ofPattern("_yyyyMMdd_HHmmss"));
+		//未入力チェック
+		if (uploadForm.getFile().isEmpty() || uploadForm.getCharset().equals("unselected")) {
+			redirectAttributes.addFlashAttribute("textConverterUploadForm", uploadForm);
+			redirectAttributes.addFlashAttribute("errorMessage", "ファイルまたは文字コードが未選択です");
+			return "redirect:/TextConverter/view";
+		}
 
 		System.out.println("-------------");
 		// 文字コードを検出
-		String detectedCharset = detectEncoding(file);
+		String detectedCharset = detectEncoding(uploadForm.getFile());
 		System.out.println(detectedCharset);
 
 		if (detectedCharset.equals("E-001")) {
+			redirectAttributes.addFlashAttribute("textConverterUploadForm", uploadForm);
 			redirectAttributes.addFlashAttribute("errorMessage", "アップロードしたファイルの文字コードが識別できません");
-			return ResponseEntity.status(HttpStatus.FOUND) // 302リダイレクト
-					.location(URI.create("/TextConverter/upload")) // リダイレクト先のURI
-					.build();
+			return "redirect:/TextConverter/view";
 		}
 
 		//テキストを読み込む
-		String content = readFile(file, detectedCharset);
-		System.out.println(content);
+		String content = readFile(uploadForm.getFile(), detectedCharset);
+		System.out.println("アップロード:\n" + content);
 
 		//変換
 		byte[] change = content.getBytes(Charset.forName(charset));
@@ -103,23 +104,40 @@ public class TextConverterController {
 
 		}
 
+		redirectAttributes.addFlashAttribute("content", change);
+		redirectAttributes.addFlashAttribute("textConverterUploadForm", uploadForm);
+
+		return "redirect:/TextConverter/download";
+	}
+
+	//変換してダウンロード
+	@GetMapping("/download")
+	public ResponseEntity<FileSystemResource> Download(
+			@ModelAttribute("textConverterUploadForm") TextConverterUploadForm uploadForm,
+			@ModelAttribute("content") byte[] change,
+			RedirectAttributes redirectAttributes,
+			HttpServletResponse response) throws IOException {
+
+		String fileName = uploadForm.getFile().getOriginalFilename();
+
+		// 現在の日時を取得してフォーマット
+		String times = LocalDateTime.now().format(DateTimeFormatter.ofPattern("_yyyyMMdd_HHmmss"));
+
 		// 新しいファイル名を作成
-		//現在のファイル名を取得
-		String originalFilename = file.getOriginalFilename();
 		//ファイル名から拡張子を取り除く
 		String baseFileName;
-		if (originalFilename != null) {
-			int lastDotIndex = originalFilename.lastIndexOf('.');
+		if (fileName != null) {
+			int lastDotIndex = fileName.lastIndexOf('.');
 			if (lastDotIndex != -1) { // '.' が見つかった場合
-				baseFileName = originalFilename.substring(0, lastDotIndex);
+				baseFileName = fileName.substring(0, lastDotIndex);
 			} else {
-				baseFileName = originalFilename; // '.' がない場合、元のファイル名を使用
+				baseFileName = fileName; // '.' がない場合、元のファイル名を使用
 			}
 		} else {
 			baseFileName = "download"; //originalFilenameがnullの場合
 		}
 		//ファイル名を作成
-		String newFileName = baseFileName + "_" + charset + times + ".txt";
+		String newFileName = baseFileName + "_" + uploadForm.getCharset() + times + ".txt";
 
 		// 一時ファイルを作成
 		Path tempFile = Files.createTempFile("tempfile_", ".txt");
@@ -177,41 +195,7 @@ public class TextConverterController {
 		return encoding;
 	}
 
-	// BOMを判定するメソッド
-	private int detectBOM(InputStream inputStream) throws IOException {
-		BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
-		byte[] bom = new byte[4];
-		bufferedInputStream.mark(bom.length); // ストリームの位置をマーク
-		int readBytes = bufferedInputStream.read(bom, 0, bom.length);
-		int bomLength = 0;
-
-		// BOMをチェックして、スキップするバイト数を決定する
-		if (readBytes >= 3 && bom[0] == (byte) 0xEF && bom[1] == (byte) 0xBB && bom[2] == (byte) 0xBF) {
-			bomLength = 3; // UTF-8 BOM
-			System.out.println("UTF-8 BOM");
-		} else if (readBytes >= 2 && bom[0] == (byte) 0xFE && bom[1] == (byte) 0xFF) {
-			bomLength = 2; // UTF-16 BE BOM
-			System.out.println("UTF-16 BE BOM");
-		} else if (readBytes >= 2 && bom[0] == (byte) 0xFF && bom[1] == (byte) 0xFE) {
-			bomLength = 2; // UTF-16 LE BOM
-			System.out.println("UTF-16 LE BOM");
-		} else if (readBytes >= 4 && bom[0] == (byte) 0x00 && bom[1] == (byte) 0x00 && bom[2] == (byte) 0xFE
-				&& bom[3] == (byte) 0xFF) {
-			bomLength = 4; // UTF-32 BE BOM
-			System.out.println("UTF-32 BE BOM");
-		} else if (readBytes >= 4 && bom[0] == (byte) 0xFF && bom[1] == (byte) 0xFE && bom[2] == (byte) 0x00
-				&& bom[3] == (byte) 0x00) {
-			bomLength = 4; // UTF-32 LE BOM
-			System.out.println("UTF-32 LE BOM");
-		}
-
-		// ストリームの位置をリセット
-		bufferedInputStream.reset();
-
-		return bomLength;
-	}
-
-	//bom判定変換後
+	// BOMを判定する
 	private int detectBOM(byte[] data) {
 		int bomLength = 0;
 
@@ -233,43 +217,38 @@ public class TextConverterController {
 				&& data[3] == (byte) 0x00) {
 			bomLength = 4; // UTF-32 LE BOM
 			System.out.println("UTF-32 LE BOM");
+		} else {
+			System.out.println("BOMなし");
 		}
 
 		return bomLength;
 	}
 
-	// テキストを読み込む
+	// テキスト読み込む
 	private String readFile(MultipartFile file, String detectedCharset) throws IOException {
-		// ファイルからInputStreamを取得
-		try (InputStream inputStream = file.getInputStream()) {
+		try (InputStream inputStream = new BufferedInputStream(file.getInputStream())) {
 
-			int bomLength = 0;
+			//BOMの長さを取得
+			int bomLength = detectBOM(file.getBytes());
 
-			if (detectedCharset.startsWith("UTF-")) {
-				// BOMを判定
-				bomLength = detectBOM(inputStream);
-			}
-
-			// BOMが存在する場合、そのバイト数をスキップする
+			// BOMをスキップ
 			if (bomLength > 0) {
 				inputStream.skip(bomLength);
 			}
 
-			// InputStreamを指定された文字コードで読み込む
+			// 指定された文字コードでInputStreamを読み込む
 			BufferedReader reader = new BufferedReader(
 					new InputStreamReader(inputStream, Charset.forName(detectedCharset)));
 			StringBuilder content = new StringBuilder();
 			String line;
-
 			while ((line = reader.readLine()) != null) {
 				content.append(line).append(System.lineSeparator());
 			}
-
 			return content.toString();
 		}
 	}
 
-	// BOMを取得するメソッド
+	// BOMを取得する
 	private byte[] getBOM(String charset) {
 		switch (charset) {
 		case "UTF-8":

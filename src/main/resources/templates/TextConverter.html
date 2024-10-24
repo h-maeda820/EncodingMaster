@@ -76,11 +76,12 @@
 </head>
 
 <body>
-	<div class="text-danger" th:text="${errorMessage}"></div>
-	<form action="/TextConverter/upload" method="post" enctype="multipart/form-data">
+	<div class="text-danger" id="errorMessage" th:text="${errorMessage}"></div>
+	<form action="/TextConverter/convert" method="post" enctype="multipart/form-data"
+		th:object="${textConverterUploadForm}">
 		<input type="file" name="file" accept=".txt" />
 		<label for="options">文字コードを選択:</label>
-		<select id="options" name="options" onchange="toggleBOMCheckbox()">
+		<select id="options" name="charset" onchange="toggleBOMCheckbox()">
 			<option value="unselected"> </option>
 			<option value="UTF-8">UTF-8</option>
 			<option value="UTF-16LE">UTF-16 LE</option>
@@ -94,26 +95,41 @@
 		</select>
 		<div id="bomCheckbox" style="display:none;">
 			<label>
-				<input type="checkbox" name="bom" value="true" /> BOMを含める
+				<input type="checkbox" name="bomExist" value="true" id="bomCheckboxInput" /> BOMを含める
 			</label>
 		</div>
-		<button type="submit">変換</button>
+		<button type="submit" onclick="clearErrorMessage();">変換</button>
 	</form>
+
+
+	<script>
+		//チェックボックス表示切り替え
+		function toggleBOMCheckbox() {
+			const charsetSelect = document.getElementById('options');
+			const bomCheckbox = document.getElementById('bomCheckbox');
+			const bomCheckboxInput = document.getElementById('bomCheckboxInput');
+			const selectedCharset = charsetSelect.options[charsetSelect.selectedIndex].value;
+
+			// UTF-8 チェックボックスを表示 チェックを外す
+			if (selectedCharset === 'UTF-8') {
+				bomCheckbox.style.display = 'block';
+				bomCheckboxInput.checked = false; // チェックを外す
+			}
+			// UTF-16LE, UTF-16BE チェックボックスを表示、チェックを入れる
+			else if (selectedCharset === 'UTF-16LE' || selectedCharset === 'UTF-16BE') {
+				bomCheckbox.style.display = 'block';
+				bomCheckboxInput.checked = true; // チェックを入れる
+			} else {
+				bomCheckbox.style.display = 'none';
+				bomCheckboxInput.checked = false; // チェックを外す
+			}
+		}
+
+		//フォーム送信時にエラーメッセージを削除
+		function clearErrorMessage() {
+			document.getElementById('errorMessage').textContent = '';
+		}
+	</script>
 </body>
 
 </html>
-<script>
-	function toggleBOMCheckbox() {
-		const charsetSelect = document.getElementById('options');
-		const bomCheckbox = document.getElementById('bomCheckbox');
-		const selectedCharset = charsetSelect.options[charsetSelect.selectedIndex].value;
-
-		// UTF-8, UTF-16, UTF-16BE の場合のみチェックボックスを表示
-		if (selectedCharset === 'UTF-8' || selectedCharset === 'UTF-16LE' || selectedCharset === 'UTF-16BE') {
-			bomCheckbox.style.display = 'block';
-		} else {
-			bomCheckbox.style.display = 'none';
-			bomCheckbox.checked = false; // チェックを外す
-		}
-	}
-</script>

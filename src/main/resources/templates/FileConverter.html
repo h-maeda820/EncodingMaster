@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>ファイル拡張子変換</title>
+	<style>
+		/* inputの色を変更 */
+		input[type="file"],
+		select {
+			background-color: #f0f0f0;
+			/* 背景色 */
+			border: 2px solid rgb(0, 210, 0);
+			/* ボーダー色 */
+			color: #333;
+			/* テキスト色 */
+			padding: 10px;
+			/* パディング */
+			border-radius: 5px;
+			/* 角を丸くする */
+			margin-bottom: 10px;
+			/* 要素間の余白を追加 */
+			width: 100%;
+			/* 幅を100%にする */
+			box-sizing: border-box;
+			/* パディングとボーダーを含める */
+		}
+
+		/* ボタンのスタイル */
+		button {
+			background-color: rgb(0, 210, 0);
+			/* ボタン背景色 */
+			color: white;
+			/* ボタンテキスト色 */
+			border: none;
+			/* ボーダーなし */
+			padding: 10px 15px;
+			/* パディング */
+			border-radius: 5px;
+			/* 角を丸くする */
+			cursor: pointer;
+			/* カーソルをポインターに */
+			width: 100%;
+			/* 幅を100%にする */
+		}
+
+		button:hover {
+			background-color: rgb(0, 180, 0);
+			/* ホバー時の色 */
+		}
+
+		/* フォーム全体のスタイル */
+		form {
+			max-width: 400px;
+			/* フォームの最大幅 */
+			margin: auto;
+			/* 中央寄せ */
+			padding: 20px;
+			/* 内側の余白 */
+			border: 1px solid #ccc;
+			/* フォームのボーダー */
+			border-radius: 10px;
+			/* 角を丸くする */
+			background-color: #fff;
+			/* 背景色 */
+		}
+
+		.text-danger {
+			color: red;
+			/* 赤色に設定 */
+			text-align: center;
+		}
+	</style>
+
+</head>
+
+<body>
+	<div class="text-danger" id="errorMessage" th:text="${errorMessage}"></div>
+	<form action="/FileConverter/convert" method="post" enctype="multipart/form-data"
+		th:object="${textConverterUploadForm}">
+		<input type="file" name="file" accept=".csv" />
+		<label for="options">拡張子を選択:</label>
+		<select id="options" name="charset" onchange="toggleBOMCheckbox()">
+			<option value="unselected"> </option>
+			<option value="XML">XML</option>
+		</select>
+
+		<button type="submit" onclick="clearErrorMessage();">変換</button>
+	</form>
+
+
+	<script>
+
+		//フォーム送信時にエラーメッセージを削除
+		function clearErrorMessage() {
+			document.getElementById('errorMessage').textContent = '';
+		}
+	</script>
+</body>
+
+</html>

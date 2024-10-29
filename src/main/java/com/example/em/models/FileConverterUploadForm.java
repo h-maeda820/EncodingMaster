@@ -4,8 +4,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 public class FileConverterUploadForm {
 
-	MultipartFile file;
-	String extension;
+	private MultipartFile file;
+	private String extension;
 
 	public MultipartFile getFile() {
 		return file;

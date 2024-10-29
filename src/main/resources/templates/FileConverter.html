@@ -78,10 +78,10 @@
 <body>
 	<div class="text-danger" id="errorMessage" th:text="${errorMessage}"></div>
 	<form action="/FileConverter/convert" method="post" enctype="multipart/form-data"
-		th:object="${textConverterUploadForm}">
+		th:object="${fileConverterUploadForm}">
 		<input type="file" name="file" accept=".csv" />
 		<label for="options">拡張子を選択:</label>
-		<select id="options" name="charset" onchange="toggleBOMCheckbox()">
+		<select id="options" name="extension" onchange="toggleBOMCheckbox()">
 			<option value="unselected"> </option>
 			<option value="XML">XML</option>
 		</select>

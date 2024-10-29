@@ -51,7 +51,7 @@ public class TextConverterController {
 
 		//未入力チェック
 		if (uploadForm.getFile().isEmpty() || uploadForm.getCharset().equals("unselected")) {
-			redirectAttributes.addFlashAttribute("textConverterUploadForm", uploadForm);
+			
 			redirectAttributes.addFlashAttribute("errorMessage", "ファイルまたは文字コードが未選択です");
 			return "redirect:/TextConverter/view";
 		}
@@ -110,7 +110,7 @@ public class TextConverterController {
 		return "redirect:/TextConverter/download";
 	}
 
-	//変換してダウンロード
+	//ダウンロード
 	@GetMapping("/download")
 	public ResponseEntity<FileSystemResource> Download(
 			@ModelAttribute("textConverterUploadForm") TextConverterUploadForm uploadForm,

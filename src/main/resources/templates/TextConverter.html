@@ -79,7 +79,7 @@
 	<div class="text-danger" id="errorMessage" th:text="${errorMessage}"></div>
 	<form action="/TextConverter/convert" method="post" enctype="multipart/form-data"
 		th:object="${textConverterUploadForm}">
-		<input type="file" name="file" accept=".txt" />
+		<input type="file" name="file" accept=".txt,.csv" />
 		<label for="options">文字コードを選択:</label>
 		<select id="options" name="charset" onchange="toggleBOMCheckbox()">
 			<option value="unselected"> </option>

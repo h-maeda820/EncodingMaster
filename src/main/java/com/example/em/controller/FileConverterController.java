@@ -1,15 +1,23 @@
 package com.example.em.controller;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 
-import org.apache.commons.io.IOUtils;
-import org.mozilla.universalchardet.UniversalDetector;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -21,6 +29,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 import com.example.em.models.FileConverterUploadForm;
 
@@ -47,23 +60,28 @@ public class FileConverterController {
 			return "redirect:/FileConverter/view";
 		}
 
-		// 文字コードを検出
-		String detectedCharset = detectEncoding(uploadForm.getFile());
-		System.out.println(detectedCharset);
-
-		if (detectedCharset.equals("E-001")) {
-			redirectAttributes.addFlashAttribute("textConverterUploadForm", uploadForm);
-			redirectAttributes.addFlashAttribute("errorMessage", "アップロードしたファイルの文字コードが識別できません");
-			return "redirect:/TextConverter/view";
+		//拡張子を取得
+		String extension = "";
+		int lastDotIndex = uploadForm.getFile().getOriginalFilename().lastIndexOf('.');
+		if (lastDotIndex != -1) {
+			// 拡張子を取得
+			extension = uploadForm.getFile().getOriginalFilename().substring(lastDotIndex + 1);
 		}
 
-		// CSVをXMLに変換
-		File xmlFile = convertCsvToXml(uploadForm.getFile(),detectedCharset);
+		//ファイルを変換
+		File convertedFile = null;
 
-//		Path xmlFile = Files.createTempFile("tempfile_", ".xml");
+		//csvからxml
+		if (extension.equals("csv") && uploadForm.getExtension().equals("xml")) {
+			convertedFile = convertCsvToXml(uploadForm.getFile());
+		}
+		//xmlからcsv
+		else if (extension.equals("xml") && uploadForm.getExtension().equals("csv")) {
+			convertedFile = convertXmlToCsv(uploadForm.getFile());
+		}
 
 		//csvに変換してFile型をセッションに保存
-		session.setAttribute("convertedFile", xmlFile);
+		session.setAttribute("convertedFile", convertedFile);
 		redirectAttributes.addFlashAttribute("fileConverterUploadForm", uploadForm);
 
 		return "redirect:/FileConverter/download";
@@ -99,7 +117,7 @@ public class FileConverterController {
 		}
 
 		//ファイル名を作成
-		String newFileName = baseFileName + "_" + times + ".xml";
+		String newFileName = baseFileName + "." + uploadForm.getExtension();
 
 		// ファイルリソースを作成
 		FileSystemResource resource = new FileSystemResource(convertedFile.toPath());
@@ -111,35 +129,126 @@ public class FileConverterController {
 		// レスポンスを返す
 		ResponseEntity<FileSystemResource> responseEntity = new ResponseEntity<>(resource, headers, HttpStatus.OK);
 
+		// レスポンス後に一時ファイルを削除したい
+		new Thread(() -> {
+			try {
+				Thread.sleep(1000); // 1秒待つ
+				Files.deleteIfExists(convertedFile.toPath()); // 一時ファイルを削除
+			} catch (IOException | InterruptedException e) {
+				e.printStackTrace();
+			}
+		}).start();
+
 		return responseEntity;
 
 	}
 
 	// CSVをXMLに変換する
-	private File convertCsvToXml(MultipartFile file,String detectedCharset) throws IOException {
+	private File convertCsvToXml(MultipartFile file) throws IOException {
 
-		return;
-	}
+		// 一時ファイルを作成
+		Path tempFile = Files.createTempFile("converted_", ".xml");
 
-	//文字コードを判定する
-	public String detectEncoding(MultipartFile file) throws IOException {
-		// ファイルをバイト配列に変換
-		byte[] fileBytes = IOUtils.toByteArray(file.getInputStream());
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream()));
+				PrintWriter writer = new PrintWriter(Files.newBufferedWriter(tempFile))) {
 
-		// UniversalDetector を使用して文字コードを検出
-		UniversalDetector detector = new UniversalDetector(null);
-		detector.handleData(fileBytes, 0, fileBytes.length);
-		detector.dataEnd();
+			// XMLのルート要素を書き出し
+			writer.println("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+			writer.println("<records>");
 
-		// 検出されたエンコーディングを取得
-		String encoding = detector.getDetectedCharset();
-		detector.reset();
+			// CSVの1行目を読み込み、フィールド名にする
+			String headerLine = reader.readLine();
+			if (headerLine != null) {
+				String[] headers = headerLine.split(",");
 
-		// エンコーディングが検出できなかった場合の処理
-		if (encoding == null) {
-			encoding = "E-001";
+				// 各データ行をXMLに変換
+				String dataLine;
+				while ((dataLine = reader.readLine()) != null) {
+					String[] values = dataLine.split(",");
+					writer.println("  <record>");
+
+					// 各フィールドに対応するXML要素を生成
+					for (int i = 0; i < headers.length; i++) {
+						String tagName = headers[i].trim();
+						String value = "";
+						if (i < values.length) {
+							value = values[i].trim();
+						}
+						writer.printf("    <%s>%s</%s>%n", tagName, value, tagName);
+					}
+					writer.println("  </record>");
+				}
+			}
+
+			writer.println("</records>");
 		}
 
-		return encoding;
+		return tempFile.toFile();
 	}
+
+	// CSVをXMLに変換する
+	private File convertXmlToCsv(MultipartFile file) throws IOException {
+		// 一時ファイルを作成
+		Path tempFile = Files.createTempFile("converted_", ".csv");
+
+		// BufferedWriterを初期化
+		try (BufferedWriter writer = Files.newBufferedWriter(tempFile, StandardCharsets.UTF_8)) {
+			// BOMを追加
+			writer.write("\uFEFF"); // UTF-8 BOMを追加
+
+			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+			DocumentBuilder builder = factory.newDocumentBuilder();
+			Document document = builder.parse(file.getInputStream());
+
+			// ルート要素を取得
+			Element root = document.getDocumentElement();
+
+			// CSV用のWriterを準備
+			// ヘッダーの作成: 最初のレコードからフィールド名を取得
+			NodeList records = root.getElementsByTagName("record");
+			if (records.getLength() > 0) {
+				Element firstRecord = (Element) records.item(0);
+				NodeList childNodes = firstRecord.getChildNodes();
+
+				// ヘッダー行を作成
+				for (int i = 0; i < childNodes.getLength(); i++) {
+					Node childNode = childNodes.item(i);
+					if (childNode instanceof Element) {
+						writer.write(childNode.getNodeName());
+						if (i < childNodes.getLength() - 2) {
+							writer.write(",");
+						}
+					}
+				}
+				writer.newLine(); // ヘッダー行の後に改行
+			}
+
+			// 各レコードを処理
+			for (int i = 0; i < records.getLength(); i++) {
+				Element record = (Element) records.item(i);
+				NodeList childNodes = record.getChildNodes();
+
+				// 各フィールドの値を取得
+				for (int j = 0; j < childNodes.getLength(); j++) {
+					Node childNode = childNodes.item(j);
+					if (childNode instanceof Element) {
+						writer.write(childNode.getTextContent());
+						if (j < childNodes.getLength() - 2) {
+							writer.write(",");
+						}
+					}
+				}
+				writer.newLine(); // 各レコードの後に改行
+			}
+		} catch (ParserConfigurationException e) {
+			System.err.println("Parserの設定に問題があります: " + e.getMessage());
+		} catch (SAXException e) {
+			System.err.println("XMLの解析に問題があります: " + e.getMessage());
+		} catch (IOException e) {
+			System.err.println("ファイルの入出力に問題があります: " + e.getMessage());
+		}
+
+		return tempFile.toFile(); // 変換後のファイルを返す
+	}
+
 }

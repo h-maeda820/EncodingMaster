@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>変換履歴</title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css">
+</head>
+
+<body>
+	<div class="container mt-5">
+		<h1>変換履歴</h1>
+		<table class="table table-bordered">
+			<thead>
+				<tr>
+					<th>年月日日時</th>
+					<th>ファイル名</th>
+					<th>変換前文字コード</th>
+					<th>変換後文字コード</th>
+				</tr>
+			</thead>
+			<tbody>
+				<th:block th:each="log : ${logList}">
+					<tr>
+						<td th:text="${log.formatCreatedAt()}"></td>
+						<td th:text="${log.fileName}"></td>
+						<td th:text="${log.originalEncoding}"></td>
+						<td th:text="${log.convertedEncoding}"></td>
+					</tr>
+				</th:block>
+			</tbody>
+		</table>
+	</div>
+</body>
+
+</html>

@@ -11,16 +11,19 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.IOUtils;
 import org.mozilla.universalchardet.UniversalDetector;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,16 +31,30 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.example.em.models.TextConverterLogForm;
 import com.example.em.models.TextConverterUploadForm;
+import com.example.em.services.TextConverterService;
 
 @Controller
 @RequestMapping("/TextConverter")
 public class TextConverterController {
 
+	@Autowired
+	TextConverterService service;
+
 	@GetMapping("/view")
 	public String TextConverterGet() {
 
 		return "TextConverter";
+	}
+
+	@GetMapping("/History")
+	public String TextConverterHistoryGet(Model model) {
+
+		List<TextConverterLogForm> list = service.getLog();
+		model.addAttribute("logList", list);
+
+		return "TextConverterHistory";
 	}
 
 	@PostMapping("/convert")
@@ -51,7 +68,7 @@ public class TextConverterController {
 
 		//未入力チェック
 		if (uploadForm.getFile().isEmpty() || uploadForm.getCharset().equals("unselected")) {
-			
+
 			redirectAttributes.addFlashAttribute("errorMessage", "ファイルまたは文字コードが未選択です");
 			return "redirect:/TextConverter/view";
 		}
@@ -104,8 +121,17 @@ public class TextConverterController {
 
 		}
 
-		redirectAttributes.addFlashAttribute("content", change);
+		//ログに追加するためのデータ
+		TextConverterLogForm logForm = new TextConverterLogForm();
+		logForm.setFileName(uploadForm.getFile().getOriginalFilename());
+		logForm.setOriginalBytes(IOUtils.toByteArray(uploadForm.getFile().getInputStream()));
+		logForm.setConvertedBytes(change);
+		logForm.setOriginalEncoding(detectedCharset);
+		logForm.setConvertedEncoding(charset);
+
+		redirectAttributes.addFlashAttribute("convertedText", change);
 		redirectAttributes.addFlashAttribute("textConverterUploadForm", uploadForm);
+		redirectAttributes.addFlashAttribute("textConverterLog", logForm);
 
 		return "redirect:/TextConverter/download";
 	}
@@ -113,8 +139,9 @@ public class TextConverterController {
 	//ダウンロード
 	@GetMapping("/download")
 	public ResponseEntity<FileSystemResource> Download(
+			@ModelAttribute("convertedText") byte[] change,
 			@ModelAttribute("textConverterUploadForm") TextConverterUploadForm uploadForm,
-			@ModelAttribute("content") byte[] change,
+			@ModelAttribute("textConverterLog") TextConverterLogForm logForm,
 			RedirectAttributes redirectAttributes,
 			HttpServletResponse response) throws IOException {
 
@@ -124,12 +151,13 @@ public class TextConverterController {
 		String times = LocalDateTime.now().format(DateTimeFormatter.ofPattern("_yyyyMMdd_HHmmss"));
 
 		// 新しいファイル名を作成
-		//ファイル名から拡張子を取り除く
-		String baseFileName;
+		String baseFileName = "";
+		String fileExtension = "";
 		if (fileName != null) {
 			int lastDotIndex = fileName.lastIndexOf('.');
 			if (lastDotIndex != -1) { // '.' が見つかった場合
 				baseFileName = fileName.substring(0, lastDotIndex);
+				fileExtension = fileName.substring(lastDotIndex + 1); // 拡張子
 			} else {
 				baseFileName = fileName; // '.' がない場合、元のファイル名を使用
 			}
@@ -137,10 +165,13 @@ public class TextConverterController {
 			baseFileName = "download"; //originalFilenameがnullの場合
 		}
 		//ファイル名を作成
-		String newFileName = baseFileName + "_" + uploadForm.getCharset() + times + ".txt";
+		String newFileName = uploadForm.getCharset() + "_" + baseFileName + "_" + "." + fileExtension;
+
+		//ログに追加
+		service.insertLog(logForm);
 
 		// 一時ファイルを作成
-		Path tempFile = Files.createTempFile("tempfile_", ".txt");
+		Path tempFile = Files.createTempFile("tempfile_", "." + fileExtension);
 		try {
 
 			// 一時ファイルに文字列を書き込む
@@ -183,7 +214,7 @@ public class TextConverterController {
 		detector.handleData(fileBytes, 0, fileBytes.length);
 		detector.dataEnd();
 
-		// 検出されたエンコーディングを取得
+		// 検出された文字コードを取得
 		String encoding = detector.getDetectedCharset();
 		detector.reset();
 

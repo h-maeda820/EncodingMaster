@@ -79,11 +79,12 @@
 	<div class="text-danger" id="errorMessage" th:text="${errorMessage}"></div>
 	<form action="/FileConverter/convert" method="post" enctype="multipart/form-data"
 		th:object="${fileConverterUploadForm}">
-		<input type="file" name="file" accept=".csv" />
+		<input type="file" name="file" accept=".csv,.xml" onchange="updateExtensionDropdown(this.files[0])" />
 		<label for="options">拡張子を選択:</label>
 		<select id="options" name="extension" onchange="toggleBOMCheckbox()">
 			<option value="unselected"> </option>
-			<option value="XML">XML</option>
+			<option value="xml">XML</option>
+			<option value="csv">CSV</option>
 		</select>
 
 		<button type="submit" onclick="clearErrorMessage();">変換</button>
@@ -91,6 +92,43 @@
 
 
 	<script>
+
+		//選択したファイルの拡張子をコンボボックス上で非表示にする
+		function updateExtensionDropdown(file) {
+			var extensionDropdown = document.getElementById('options');
+			var selectedExtension = '';
+
+			// ファイルが選択されている場合、拡張子を取得
+			if (file) {
+				var fileName = file.name;
+				var dotIndex = fileName.lastIndexOf('.');
+				if (dotIndex !== -1) {
+					selectedExtension = fileName.substring(dotIndex + 1);
+				}
+			}
+
+			// 拡張子オプションを非表示にする
+			for (var i = 0; i < extensionDropdown.options.length; i++) {
+				var option = extensionDropdown.options[i];
+				if (option.value === selectedExtension) {
+					option.style.display = 'none'; // 選択した拡張子を非表示
+				} else {
+					option.style.display = 'block'; // その他は表示
+				}
+			}
+
+			// ファイルの拡張子とコンボボックスの値が同じ場合、unselectedに設定
+			if (selectedExtension) {
+				for (var i = 0; i < extensionDropdown.options.length; i++) {
+					var option = extensionDropdown.options[i];
+
+					if (option.value === selectedExtension) {
+						extensionDropdown.value = 'unselected'; // 値をunselectedに設定
+						break;
+					}
+				}
+			}
+		}
 
 		//フォーム送信時にエラーメッセージを削除
 		function clearErrorMessage() {

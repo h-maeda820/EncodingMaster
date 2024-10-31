@@ -9,8 +9,6 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import javax.servlet.http.HttpServletResponse;
@@ -28,6 +26,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -36,41 +35,34 @@ import com.example.em.models.TextConverterUploadForm;
 import com.example.em.services.TextConverterService;
 
 @Controller
-@RequestMapping("/TextConverter")
+@RequestMapping("/textConverter")
 public class TextConverterController {
 
 	@Autowired
 	TextConverterService service;
 
 	@GetMapping("/view")
-	public String TextConverterGet() {
+	public String ViewGet() {
 
 		return "TextConverter";
 	}
 
-	@GetMapping("/History")
-	public String TextConverterHistoryGet(Model model) {
-
-		List<TextConverterLogForm> list = service.getLog();
-		model.addAttribute("logList", list);
-
-		return "TextConverterHistory";
-	}
-
 	@PostMapping("/convert")
-	public String TextConverterPost(
+	public String ConvertPost(
 			@ModelAttribute("textConverterUploadForm") TextConverterUploadForm uploadForm,
 			RedirectAttributes redirectAttributes,
 			HttpServletResponse response) throws IOException {
 
 		String charset = uploadForm.getCharset();
 		Boolean bomExist = uploadForm.getBomExist();
+		//ログに追加するためのデータ
+		TextConverterLogForm logForm = new TextConverterLogForm();
 
 		//未入力チェック
 		if (uploadForm.getFile().isEmpty() || uploadForm.getCharset().equals("unselected")) {
 
 			redirectAttributes.addFlashAttribute("errorMessage", "ファイルまたは文字コードが未選択です");
-			return "redirect:/TextConverter/view";
+			return "redirect:/textConverter/view";
 		}
 
 		System.out.println("-------------");
@@ -81,7 +73,7 @@ public class TextConverterController {
 		if (detectedCharset.equals("E-001")) {
 			redirectAttributes.addFlashAttribute("textConverterUploadForm", uploadForm);
 			redirectAttributes.addFlashAttribute("errorMessage", "アップロードしたファイルの文字コードが識別できません");
-			return "redirect:/TextConverter/view";
+			return "redirect:/textConverter/view";
 		}
 
 		//テキストを読み込む
@@ -115,14 +107,14 @@ public class TextConverterController {
 
 					// changeを更新
 					change = result;
-
 				}
+				logForm.setConvertedBom(1);
 			}
-
+			logForm.setConvertedBom(2);
+		} else {
+			logForm.setConvertedBom(0);
 		}
 
-		//ログに追加するためのデータ
-		TextConverterLogForm logForm = new TextConverterLogForm();
 		logForm.setFileName(uploadForm.getFile().getOriginalFilename());
 		logForm.setOriginalBytes(IOUtils.toByteArray(uploadForm.getFile().getInputStream()));
 		logForm.setConvertedBytes(change);
@@ -131,24 +123,21 @@ public class TextConverterController {
 
 		redirectAttributes.addFlashAttribute("convertedText", change);
 		redirectAttributes.addFlashAttribute("textConverterUploadForm", uploadForm);
-		redirectAttributes.addFlashAttribute("textConverterLog", logForm);
+		redirectAttributes.addFlashAttribute("textConverterLogForm", logForm);
 
-		return "redirect:/TextConverter/download";
+		return "redirect:/textConverter/download";
 	}
 
 	//ダウンロード
 	@GetMapping("/download")
-	public ResponseEntity<FileSystemResource> Download(
+	public ResponseEntity<FileSystemResource> DownloadGet(
 			@ModelAttribute("convertedText") byte[] change,
 			@ModelAttribute("textConverterUploadForm") TextConverterUploadForm uploadForm,
-			@ModelAttribute("textConverterLog") TextConverterLogForm logForm,
+			@ModelAttribute("textConverterLogForm") TextConverterLogForm logForm,
 			RedirectAttributes redirectAttributes,
 			HttpServletResponse response) throws IOException {
 
 		String fileName = uploadForm.getFile().getOriginalFilename();
-
-		// 現在の日時を取得してフォーマット
-		String times = LocalDateTime.now().format(DateTimeFormatter.ofPattern("_yyyyMMdd_HHmmss"));
 
 		// 新しいファイル名を作成
 		String baseFileName = "";
@@ -202,6 +191,91 @@ public class TextConverterController {
 			// エラーレスポンスを返す
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
 		}
+	}
+
+	//履歴を表示
+	@GetMapping("/history")
+	public String HistoryGet(Model model) {
+
+		List<TextConverterLogForm> list = service.getLog();
+		model.addAttribute("logList", list);
+
+		return "TextConverterHistory";
+	}
+
+	//履歴からダウンロード
+	@GetMapping("/historyDownload")
+	public ResponseEntity<FileSystemResource> HistoryDownloadGet(
+			@RequestParam(name = "logId", required = false) Integer logId,
+			RedirectAttributes redirectAttributes,
+			HttpServletResponse response) throws IOException {
+
+		//履歴からデータを取得
+		TextConverterLogForm log = service.getLogById(logId);
+
+		String fileName = log.getFileName();
+
+		// 新しいファイル名を作成
+		String baseFileName = "";
+		String fileExtension = "";
+		if (fileName != null) {
+			int lastDotIndex = fileName.lastIndexOf('.');
+			if (lastDotIndex != -1) { // '.' が見つかった場合
+				baseFileName = fileName.substring(0, lastDotIndex);
+				fileExtension = fileName.substring(lastDotIndex + 1); // 拡張子
+			} else {
+				baseFileName = fileName; // '.' がない場合、元のファイル名を使用
+			}
+		} else {
+			baseFileName = "download"; //originalFilenameがnullの場合
+		}
+		//ファイル名を作成
+		String newFileName = log.getConvertedEncoding() + "_" + baseFileName + "_" + "." + fileExtension;
+
+		// 一時ファイルを作成
+		Path tempFile = Files.createTempFile("tempfile_", "." + fileExtension);
+		try {
+
+			// 一時ファイルに文字列を書き込む
+			Files.write(tempFile, log.getConvertedBytes(), StandardOpenOption.WRITE);
+
+			// ファイルリソースを作成
+			FileSystemResource resource = new FileSystemResource(tempFile);
+
+			// HTTPヘッダーを設定
+			HttpHeaders headers = new HttpHeaders();
+			headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + newFileName);
+
+			// レスポンスを返す
+			ResponseEntity<FileSystemResource> responseEntity = new ResponseEntity<>(resource, headers, HttpStatus.OK);
+
+			// レスポンス後に一時ファイルを削除したい
+			new Thread(() -> {
+				try {
+					Thread.sleep(1000); // 1秒待つ
+					Files.deleteIfExists(tempFile); // 一時ファイルを削除
+				} catch (IOException | InterruptedException e) {
+					e.printStackTrace();
+				}
+			}).start();
+
+			return responseEntity;
+		} catch (IOException e) {
+			// エラーレスポンスを返す
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+		}
+
+	}
+
+	//履歴を削除
+	@GetMapping("/historyDelete")
+	public String HistoryDeleteGet(@RequestParam(name = "logId", required = false) Integer logId,
+			RedirectAttributes redirectAttributes) {
+
+		int result = service.historyDelete(logId);
+		redirectAttributes.addFlashAttribute("message", "削除しました。");
+
+		return "redirect:/textConverter/history";
 	}
 
 	//文字コードを判定する

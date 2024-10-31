@@ -10,16 +10,20 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "text_converter_log")
-public class TextConverterLogForm {
+@Table(name = "file_converter_log")
+public class FileConverterLogForm {
 
 	@Id
-
-
 	private Integer id;
 
 	@Column(name = "file_name")
-	private String fileName;
+	private String fileName; // 元のファイル名
+
+	@Column(name = "original_extension")
+	private String originalExtension; // 変換前の拡張子
+
+	@Column(name = "converted_extension")
+	private String convertedExtension; // 変換後の拡張子
 
 	@Column(name = "original_bytes")
 	private byte[] originalBytes; // 変換前のバイト列
@@ -27,38 +31,31 @@ public class TextConverterLogForm {
 	@Column(name = "converted_bytes")
 	private byte[] convertedBytes; // 変換後のバイト列
 
-	@Column(name = "original_encoding")
-	private String originalEncoding;//変換前コード
-
-	@Column(name = "converted_encoding")
-	private String convertedEncoding;//変換後コード
-
-	@Column(name = "converted_bom")
-	private Integer convertedBom; // BOMの有無 0:対象外 1:あり 2;なし
-
 	@Column(name = "created_at")
 	private String createdAt; // 作成日
 
 	// デフォルトコンストラクタ
-	public TextConverterLogForm() {
+	public FileConverterLogForm() {
 		this.fileName = "";
+		this.originalExtension = "";
+		this.convertedExtension = "";
 		this.originalBytes = new byte[0];
 		this.convertedBytes = new byte[0];
-		this.originalEncoding = "";
-		this.convertedEncoding = "";
+
 		this.createdAt = "";
-		this.convertedBom = 0;
+
 	}
 
 	// コンストラクタ
-	public TextConverterLogForm(String fileName, byte[] originalBytes, byte[] convertedBytes, String originalEncoding,
-			String convertedEncoding, Integer hasBom) {
+	public FileConverterLogForm(String fileName, String originalExtension, String convertedExtension,
+			byte[] originalBytes, byte[] convertedBytes,
+			String originalEncoding, String convertedEncoding, Integer hasBom) {
 		this.fileName = fileName;
+		this.originalExtension = originalExtension;
+		this.convertedExtension = convertedExtension;
 		this.originalBytes = originalBytes;
 		this.convertedBytes = convertedBytes;
-		this.originalEncoding = originalEncoding;
-		this.convertedEncoding = convertedEncoding;
-		this.convertedBom = hasBom;
+
 	}
 
 	// 作成日をフォーマットして登録する
@@ -85,6 +82,22 @@ public class TextConverterLogForm {
 		this.fileName = fileName;
 	}
 
+	public String getOriginalExtension() {
+		return originalExtension;
+	}
+
+	public void setOriginalExtension(String originalExtension) {
+		this.originalExtension = originalExtension;
+	}
+
+	public String getConvertedExtension() {
+		return convertedExtension;
+	}
+
+	public void setConvertedExtension(String convertedExtension) {
+		this.convertedExtension = convertedExtension;
+	}
+
 	public byte[] getOriginalBytes() {
 		return originalBytes;
 	}
@@ -99,30 +112,6 @@ public class TextConverterLogForm {
 
 	public void setConvertedBytes(byte[] convertedBytes) {
 		this.convertedBytes = convertedBytes;
-	}
-
-	public String getOriginalEncoding() {
-		return originalEncoding;
-	}
-
-	public void setOriginalEncoding(String originalEncoding) {
-		this.originalEncoding = originalEncoding;
-	}
-
-	public String getConvertedEncoding() {
-		return convertedEncoding;
-	}
-
-	public void setConvertedEncoding(String convertedEncoding) {
-		this.convertedEncoding = convertedEncoding;
-	}
-
-	public Integer getConvertedBom() {
-		return convertedBom;
-	}
-
-	public void setConvertedBom(Integer hasBom) {
-		this.convertedBom = hasBom;
 	}
 
 	public String getCreatedAt() {

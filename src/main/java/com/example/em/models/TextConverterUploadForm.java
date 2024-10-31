@@ -7,6 +7,13 @@ public class TextConverterUploadForm {
 	private Boolean bomExist;
 	private String charset;
 
+	// デフォルトコンストラクタ
+	public TextConverterUploadForm() {
+		this.file = null; // ファイルはnullで初期化
+		this.bomExist = false; // BOMの存在をfalseで初期化
+		this.charset = ""; // デフォルトの文字コードを設定
+	}
+
 	public MultipartFile getFile() {
 		return file;
 	}

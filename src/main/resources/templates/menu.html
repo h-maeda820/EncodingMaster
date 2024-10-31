@@ -12,8 +12,7 @@
 			background-color: #f9f9f9;
 			display: flex;
 			justify-content: center;
-			align-items: flex-start;
-			/* 上に寄せる */
+			align-items: flex-start; /* 上に寄せる */
 			height: 100vh;
 			margin: 0;
 		}
@@ -23,32 +22,26 @@
 			background-color: #fff;
 			border: 1px solid #ccc;
 			border-radius: 10px;
-			padding: 15px;
-			/* 上下の余白を調整 */
+			padding: 20px; /* 上下の余白を調整 */
 			box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-			width: 300px;
-			/* 横幅を小さく */
+			width: 300px; /* 横幅を小さく */
 			text-align: center;
-			margin-top: 20px;
+			margin-top: 40px; /* 上部にマージンを追加 */
 		}
 
 		/* タイトルのスタイル */
 		h1 {
 			color: #333;
-			font-size: 20px;
-			/* タイトルのサイズを小さく */
-			margin: 0 0 15px 0;
-			/* 下の余白を縮小 */
+			font-size: 24px; /* タイトルのサイズを大きく */
+			margin: 0 0 15px 0; /* 下の余白を縮小 */
 		}
 
 		/* メニューボタンのスタイル */
 		.menu-button {
 			display: block;
 			width: 100%;
-			padding: 10px;
-			/* 上下のパディングを縮小 */
-			margin: 8px 0;
-			/* ボタン間のマージンを縮小 */
+			padding: 12px; /* 上下のパディングを少し増やす */
+			margin: 8px 0; /* ボタン間のマージンを縮小 */
 			color: white;
 			border: none;
 			border-radius: 5px;
@@ -62,16 +55,16 @@
 		/* ボタンごとの背景色 */
 		#textConverterButton {
 			background-color: #0056b3;
+			font-weight: 550;
 		}
 
 		#fileConverterButton {
 			background-color: rgb(0, 210, 0);
-
+			font-weight: 550;
 		}
 
 		.menu-button:hover {
-			opacity: 0.9;
-			/* ホバー時の少し暗くなる効果 */
+			opacity: 0.9; /* ホバー時の少し暗くなる効果 */
 		}
 	</style>
 </head>
@@ -79,8 +72,8 @@
 <body>
 	<div class="container">
 		<h1>EncodingMaster</h1>
-		<a href="/TextConverter/view" id="textConverterButton" class="menu-button">Text Converter</a>
-		<a href="/FileConverter/view" id="fileConverterButton" class="menu-button">File Converter</a>
+		<a href="/textConverter/view" id="textConverterButton" class="menu-button">文字コード変換</a>
+		<a href="/fileConverter/view" id="fileConverterButton" class="menu-button">ファイル拡張子変換</a>
 	</div>
 </body>
 

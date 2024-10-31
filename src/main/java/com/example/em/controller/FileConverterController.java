@@ -18,11 +18,14 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.apache.commons.io.IOUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,18 +38,25 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import com.example.em.models.FileConverterLogForm;
 import com.example.em.models.FileConverterUploadForm;
+import com.example.em.services.FileConverterService;
 
 @Controller
-@RequestMapping("/FileConverter")
+@RequestMapping("/fileConverter")
 public class FileConverterController {
 
+	@Autowired
+	FileConverterService service;
+
+	//メイン画面
 	@GetMapping("/view")
 	public String FileConverterGet() {
 
 		return "FileConverter";
 	}
 
+	//変換
 	@PostMapping("/convert")
 	public String FileConverterPost(
 			@ModelAttribute("fileConverterUploadForm") FileConverterUploadForm uploadForm,
@@ -57,7 +67,7 @@ public class FileConverterController {
 		if (uploadForm.getFile().isEmpty() || uploadForm.getExtension().equals("unselected")) {
 
 			redirectAttributes.addFlashAttribute("errorMessage", "ファイルまたは拡張子が未選択です");
-			return "redirect:/FileConverter/view";
+			return "redirect:/fileConverter/view";
 		}
 
 		//拡張子を取得
@@ -80,16 +90,27 @@ public class FileConverterController {
 			convertedFile = convertXmlToCsv(uploadForm.getFile());
 		}
 
+		// 履歴をデータベースに保存
+		FileConverterLogForm logForm = new FileConverterLogForm();
+		logForm.setFileName(uploadForm.getFile().getOriginalFilename());
+		logForm.setOriginalExtension(extension);
+		logForm.setConvertedExtension(uploadForm.getExtension());
+		logForm.setOriginalBytes(IOUtils.toByteArray(uploadForm.getFile().getInputStream()));
+		logForm.setConvertedBytes(Files.readAllBytes(convertedFile.toPath()));
+
 		//csvに変換してFile型をセッションに保存
 		session.setAttribute("convertedFile", convertedFile);
 		redirectAttributes.addFlashAttribute("fileConverterUploadForm", uploadForm);
+		redirectAttributes.addFlashAttribute("fileConverterLogForm", logForm);
 
-		return "redirect:/FileConverter/download";
+		return "redirect:/fileConverter/download";
 	}
 
+	//ダウンロード
 	@GetMapping("/download")
 	public ResponseEntity<FileSystemResource> Download(
 			@ModelAttribute("fileConverterUploadForm") FileConverterUploadForm uploadForm,
+			@ModelAttribute("fileConverterLogForm") FileConverterLogForm logForm,
 			//			@ModelAttribute("content") byte[] change,
 			RedirectAttributes redirectAttributes, HttpSession session,
 			HttpServletResponse response) throws IOException {
@@ -119,6 +140,9 @@ public class FileConverterController {
 		//ファイル名を作成
 		String newFileName = baseFileName + "." + uploadForm.getExtension();
 
+		//ログに追加
+		service.insertLog(logForm);
+
 		// ファイルリソースを作成
 		FileSystemResource resource = new FileSystemResource(convertedFile.toPath());
 
@@ -141,6 +165,30 @@ public class FileConverterController {
 
 		return responseEntity;
 
+	}
+
+	//履歴を表示
+	@GetMapping("/history")
+	public String HistoryGet(Model model) {
+
+		//List<TextConverterLogForm> list = service.getLog();
+		//model.addAttribute("logList", list);
+
+		return "FileConverterHistory";
+	}
+
+	//履歴からダウンロード
+	@GetMapping("/historyDownload")
+	public ResponseEntity<FileSystemResource> HistoryDownloadGet() {
+
+		return null;
+	}
+
+	//履歴を削除
+	@GetMapping("/historyDelete")
+	public String HistoryDeleteGet() {
+
+		return "";
 	}
 
 	// CSVをXMLに変換する

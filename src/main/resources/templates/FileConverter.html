@@ -5,84 +5,71 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>ファイル拡張子変換</title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 	<style>
-		/* inputの色を変更 */
+		body {
+			margin: 0;
+			text-align: center;
+			background-color: #f8f9fa;
+		}
+
+		h1 {
+			margin-bottom: 10px;
+		}
+
+		form {
+			max-width: 400px;
+			margin: 20px auto;
+			padding: 20px;
+			border: 1px solid #ccc;
+			border-radius: 10px;
+			background-color: #fff;
+			box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+		}
+
 		input[type="file"],
 		select {
 			background-color: #f0f0f0;
-			/* 背景色 */
 			border: 2px solid rgb(0, 210, 0);
-			/* ボーダー色 */
 			color: #333;
-			/* テキスト色 */
 			padding: 10px;
-			/* パディング */
 			border-radius: 5px;
-			/* 角を丸くする */
 			margin-bottom: 10px;
-			/* 要素間の余白を追加 */
 			width: 100%;
-			/* 幅を100%にする */
 			box-sizing: border-box;
-			/* パディングとボーダーを含める */
 		}
 
-		/* ボタンのスタイル */
 		button {
 			background-color: rgb(0, 210, 0);
-			/* ボタン背景色 */
 			color: white;
-			/* ボタンテキスト色 */
 			border: none;
-			/* ボーダーなし */
 			padding: 10px 15px;
-			/* パディング */
 			border-radius: 5px;
-			/* 角を丸くする */
 			cursor: pointer;
-			/* カーソルをポインターに */
 			width: 100%;
-			/* 幅を100%にする */
 		}
 
 		button:hover {
 			background-color: rgb(0, 180, 0);
-			/* ホバー時の色 */
-		}
-
-		/* フォーム全体のスタイル */
-		form {
-			max-width: 400px;
-			/* フォームの最大幅 */
-			margin: auto;
-			/* 中央寄せ */
-			padding: 20px;
-			/* 内側の余白 */
-			border: 1px solid #ccc;
-			/* フォームのボーダー */
-			border-radius: 10px;
-			/* 角を丸くする */
-			background-color: #fff;
-			/* 背景色 */
 		}
 
 		.text-danger {
 			color: red;
-			/* 赤色に設定 */
 			text-align: center;
 		}
 	</style>
-
 </head>
 
 <body>
+	<div th:replace="header.html"></div>
+	<h1>ファイル拡張子変換</h1>
 	<div class="text-danger" id="errorMessage" th:text="${errorMessage}"></div>
-	<form action="/FileConverter/convert" method="post" enctype="multipart/form-data"
+	<form action="/fileConverter/convert" method="post" enctype="multipart/form-data"
 		th:object="${fileConverterUploadForm}">
 		<input type="file" name="file" accept=".csv,.xml" onchange="updateExtensionDropdown(this.files[0])" />
 		<label for="options">拡張子を選択:</label>
-		<select id="options" name="extension" onchange="toggleBOMCheckbox()">
-			<option value="unselected"> </option>
+		<select id="options" name="extension">
+			<option value="unselected">選択してください</option>
 			<option value="xml">XML</option>
 			<option value="csv">CSV</option>
 		</select>
@@ -90,15 +77,14 @@
 		<button type="submit" onclick="clearErrorMessage();">変換</button>
 	</form>
 
+	<a href="/fileConverter/history" class="history-button"
+		style="background-color: rgb(0, 210, 0); color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; margin-top: 10px;">履歴を見る</a>
 
 	<script>
-
-		//選択したファイルの拡張子をコンボボックス上で非表示にする
 		function updateExtensionDropdown(file) {
 			var extensionDropdown = document.getElementById('options');
 			var selectedExtension = '';
 
-			// ファイルが選択されている場合、拡張子を取得
 			if (file) {
 				var fileName = file.name;
 				var dotIndex = fileName.lastIndexOf('.');
@@ -107,30 +93,26 @@
 				}
 			}
 
-			// 拡張子オプションを非表示にする
 			for (var i = 0; i < extensionDropdown.options.length; i++) {
 				var option = extensionDropdown.options[i];
 				if (option.value === selectedExtension) {
-					option.style.display = 'none'; // 選択した拡張子を非表示
+					option.style.display = 'none';
 				} else {
-					option.style.display = 'block'; // その他は表示
+					option.style.display = 'block';
 				}
 			}
 
-			// ファイルの拡張子とコンボボックスの値が同じ場合、unselectedに設定
 			if (selectedExtension) {
 				for (var i = 0; i < extensionDropdown.options.length; i++) {
 					var option = extensionDropdown.options[i];
-
 					if (option.value === selectedExtension) {
-						extensionDropdown.value = 'unselected'; // 値をunselectedに設定
+						extensionDropdown.value = 'unselected';
 						break;
 					}
 				}
 			}
 		}
 
-		//フォーム送信時にエラーメッセージを削除
 		function clearErrorMessage() {
 			document.getElementById('errorMessage').textContent = '';
 		}

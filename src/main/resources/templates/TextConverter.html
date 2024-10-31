@@ -5,84 +5,87 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>文字コード変換</title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 	<style>
-		/* inputの色を変更 */
+		body {
+			margin: 0;
+			text-align: center;
+			background-color: #f8f9fa;
+		}
+
+		h1 {
+			margin-bottom: 10px;
+		}
+
+		form {
+			max-width: 400px;
+			margin: 20px auto;
+			padding: 20px;
+			border: 1px solid #ccc;
+			border-radius: 10px;
+			background-color: #fff;
+			box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+		}
+
 		input[type="file"],
 		select {
 			background-color: #f0f0f0;
-			/* 背景色 */
 			border: 2px solid #007BFF;
-			/* ボーダー色 */
 			color: #333;
-			/* テキスト色 */
 			padding: 10px;
-			/* パディング */
 			border-radius: 5px;
-			/* 角を丸くする */
 			margin-bottom: 10px;
-			/* 要素間の余白を追加 */
 			width: 100%;
-			/* 幅を100%にする */
 			box-sizing: border-box;
-			/* パディングとボーダーを含める */
 		}
 
-		/* ボタンのスタイル */
-		button {
+		button,
+		.history-button {
 			background-color: #007BFF;
-			/* ボタン背景色 */
 			color: white;
-			/* ボタンテキスト色 */
 			border: none;
-			/* ボーダーなし */
 			padding: 10px 15px;
-			/* パディング */
 			border-radius: 5px;
-			/* 角を丸くする */
 			cursor: pointer;
-			/* カーソルをポインターに */
 			width: 100%;
-			/* 幅を100%にする */
+			text-decoration: none;
+			font-size: 16px;
+			/* フォントサイズを設定 */
 		}
 
-		button:hover {
+		button:hover,
+		.history-button:hover {
 			background-color: #0056b3;
-			/* ホバー時の色 */
-		}
-
-		/* フォーム全体のスタイル */
-		form {
-			max-width: 400px;
-			/* フォームの最大幅 */
-			margin: auto;
-			/* 中央寄せ */
-			padding: 20px;
-			/* 内側の余白 */
-			border: 1px solid #ccc;
-			/* フォームのボーダー */
-			border-radius: 10px;
-			/* 角を丸くする */
-			background-color: #fff;
-			/* 背景色 */
 		}
 
 		.text-danger {
 			color: red;
-			/* 赤色に設定 */
 			text-align: center;
 		}
-	</style>
 
+		.history-button-container {
+			max-width: 400px;
+			margin: 40px auto 0;
+		}
+
+		/* BOMチェックボックスのスタイル */
+		#bomCheckbox {
+			text-align: left;
+			margin-top: 10px;
+		}
+	</style>
 </head>
 
 <body>
+	<div th:replace="header.html"></div>
+	<h1>文字コード変換</h1>
 	<div class="text-danger" id="errorMessage" th:text="${errorMessage}"></div>
-	<form action="/TextConverter/convert" method="post" enctype="multipart/form-data"
+	<form action="/textConverter/convert" method="post" enctype="multipart/form-data"
 		th:object="${textConverterUploadForm}">
 		<input type="file" name="file" accept=".txt,.csv" />
 		<label for="options">文字コードを選択:</label>
 		<select id="options" name="charset" onchange="toggleBOMCheckbox()">
-			<option value="unselected"> </option>
+			<option value="unselected">選択してください</option>
 			<option value="UTF-8">UTF-8</option>
 			<option value="UTF-16LE">UTF-16 LE</option>
 			<option value="UTF-16BE">UTF-16 BE</option>
@@ -101,31 +104,30 @@
 		<button type="submit" onclick="clearErrorMessage();">変換</button>
 	</form>
 
+	<!-- 履歴に遷移するボタン -->
+	<div class="history-button-container">
+		<a href="/textConverter/history" class="history-button">履歴を見る</a>
+	</div>
 
 	<script>
-		//チェックボックス表示切り替え
 		function toggleBOMCheckbox() {
 			const charsetSelect = document.getElementById('options');
 			const bomCheckbox = document.getElementById('bomCheckbox');
 			const bomCheckboxInput = document.getElementById('bomCheckboxInput');
 			const selectedCharset = charsetSelect.options[charsetSelect.selectedIndex].value;
 
-			// UTF-8 チェックボックスを表示 チェックを外す
 			if (selectedCharset === 'UTF-8') {
 				bomCheckbox.style.display = 'block';
-				bomCheckboxInput.checked = false; // チェックを外す
-			}
-			// UTF-16LE, UTF-16BE チェックボックスを表示、チェックを入れる
-			else if (selectedCharset === 'UTF-16LE' || selectedCharset === 'UTF-16BE') {
+				bomCheckboxInput.checked = false;
+			} else if (selectedCharset === 'UTF-16LE' || selectedCharset === 'UTF-16BE') {
 				bomCheckbox.style.display = 'block';
-				bomCheckboxInput.checked = true; // チェックを入れる
+				bomCheckboxInput.checked = true;
 			} else {
 				bomCheckbox.style.display = 'none';
-				bomCheckboxInput.checked = false; // チェックを外す
+				bomCheckboxInput.checked = false;
 			}
 		}
 
-		//フォーム送信時にエラーメッセージを削除
 		function clearErrorMessage() {
 			document.getElementById('errorMessage').textContent = '';
 		}
